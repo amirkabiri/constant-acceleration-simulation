@@ -1,0 +1,192 @@
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+
+    <style>
+        *{
+            padding: 0;
+            margin: 0;
+        }
+        body {
+            font-family: 'Roboto', sans-serif;
+        }
+        #canvas {
+            background: #ddd;
+        }
+        #info {
+            min-width: 150px;
+            position: fixed;
+            top: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+        }
+        .info-item{
+            padding:7px 15px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .info-item:not(:last-child){
+            border-bottom: 1px solid rgba(255,255,255,.1);
+        }
+        .info-item-name{
+            margin-right:10px;
+            color:rgba(255, 255, 255, 0.7);
+            font-size: 13px;
+        }
+        .info-item-name::after{
+            content: ' :';
+        }
+        .info-item-value{
+            display: flex;
+            align-items: center;
+        }
+        .info-item-value::after{
+            margin-left:5px;
+            content: attr(data-unit);
+            font-size: 13px;
+            color:rgba(255,255,255,0.7);
+        }
+    </style>
+</head>
+<body>
+<div id="info">
+    <div class="info-item">
+        <span class="info-item-name">Time</span>
+        <span class="info-item-value" data-info-key="time" data-unit="s">0</span>
+    </div>
+    <div class="info-item">
+        <span class="info-item-name">Displacement</span>
+        <span class="info-item-value" data-info-key="displacement" data-unit="px">0</span>
+    </div>
+    <div class="info-item">
+        <span class="info-item-name">Velocity</span>
+        <span class="info-item-value" data-info-key="velocity" data-unit="px/s">0</span>
+    </div>
+    <div class="info-item">
+        <span class="info-item-name">Distance</span>
+        <span class="info-item-value" data-info-key="distance" data-unit="px">0</span>
+    </div>
+    <div class="info-item">
+        <span class="info-item-name">Speed</span>
+        <span class="info-item-value" data-info-key="speed" data-unit="px/s">0</span>
+    </div>
+    <div class="info-item">
+        <span class="info-item-name">Instantaneous Velocity</span>
+        <span class="info-item-value" data-info-key="instantaneous-velocity" data-unit="px/s">0</span>
+    </div>
+    <div class="info-item">
+        <span class="info-item-name">Frame Rate</span>
+        <span class="info-item-value" data-info-key="fps" data-unit="fps">0</span>
+    </div>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<script src="src/utility.js"></script>
+<script src="src/Game.js"></script>
+<script src="src/Info.js"></script>
+
+<script src="src/objects/GameObject.js"></script>
+<script src="src/objects/Rectangle.js"></script>
+<script src="src/objects/Button.js"></script>
+<script src="src/objects/Car.js"></script>
+<script src="src/objects/DisplacementLine.js"></script>
+<script src="src/objects/Dot.js"></script>
+<script src="src/objects/Speedometer.js"></script>
+
+<script>
+  const info = new Info();
+  const canvas = document.getElementById('canvas');
+  canvas.width = innerWidth - 1;
+  canvas.height = innerHeight - 1;
+  const ctx = canvas.getContext('2d');
+
+  let startTime;
+  const startPos = [400, 400];
+  let gameObjects = [
+    new Car(startPos.slice()), new DisplacementLine(startPos, startPos), new Speedometer(),
+    new Button([35 + 60, canvas.height - 35 - 60], 'W'),
+    new Button([35, canvas.height - 35], 'A'),
+    new Button([35 + 60, canvas.height - 35], 'S'),
+    new Button([35 + 2 * 60, canvas.height - 35], 'D'),
+  ];
+  const dotsStartIndexInGameObject = gameObjects.length;
+
+  const game = new Game();
+  game.register();
+  const assets = [
+    game.addAsset('car', 'src/assets/car.png')
+  ];
+  game.registerKeyGroup('forward', ['w', 'W', 'ص', 'ArrowUp']);
+  game.registerKeyGroup('backward', ['s', 'S', 'س', 'ArrowDown']);
+  game.registerKeyGroup('turnRight', ['d', 'D', 'ی', 'ArrowRight']);
+  game.registerKeyGroup('turnLeft', ['a', 'A', 'ش', 'ArrowLeft']);
+
+  game.onKeyPress(['forward', 'backward'], function (key) {
+    if(!startTime) startTime = Date.now();
+  });
+  game.onKeyPress(['forward', 'backward', 'turnRight', 'turnLeft'], key => {
+    const mapKeyGroupToObjectIndex = {forward: 3, turnLeft: 4, backward: 5, turnRight: 6};
+    for(const [name, keys] of Object.entries(game.keys)){
+      if(!keys.includes(key)) continue;
+
+      gameObjects[mapKeyGroupToObjectIndex[name]].active = true;
+      break;
+    }
+  });
+  game.onKeyRelease(['forward', 'backward', 'turnRight', 'turnLeft'], key => {
+    const mapKeyGroupToObjectIndex = {forward: 3, turnLeft: 4, backward: 5, turnRight: 6};
+    for(const [name, keys] of Object.entries(game.keys)){
+      if(!keys.includes(key)) continue;
+
+      gameObjects[mapKeyGroupToObjectIndex[name]].active = false;
+      break;
+    }
+  })
+  game.loop = function(){
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (game.isKeyPressed('forward')) gameObjects[0].forward();
+    if (game.isKeyPressed('backward')) gameObjects[0].backward();
+    if (game.isKeyPressed('turnRight')) gameObjects[0].turn(5);
+    if (game.isKeyPressed('turnLeft')) gameObjects[0].turn(-5);
+
+    let deltaTime = Date.now() - startTime;
+    info.updateAttribute('time', (deltaTime / 1000).toFixed(1));
+
+    gameObjects.forEach(gameObject => {
+      gameObject.process().draw();
+    })
+
+    const displacement = euclideanDistance(gameObjects[0].pos, startPos);
+    const velocity = displacement / (deltaTime / 1000);
+    info.updateAttribute('displacement', Math.round(displacement));
+    info.updateAttribute('velocity', velocity.toFixed(1));
+
+    const distance = gameObjects.slice(dotsStartIndexInGameObject).reduce(({ distance, prevDot }, currentDot) => {
+      const newDistance = distance + euclideanDistance(prevDot.pos, currentDot.pos);
+      return { distance: newDistance, prevDot: currentDot };
+    }, { distance: 0, prevDot: gameObjects[1] }).distance;
+    info.updateAttribute('distance', Math.round(distance));
+    info.updateAttribute('speed', (distance / (deltaTime / 1000)).toFixed(1));
+
+    info.updateFPS(Math.round(game.fps));
+    info.updateAttribute('instantaneous-velocity', Math.round(gameObjects[0].instantaneousVelocity));
+  };
+
+  Promise.all(assets).then(() => {
+    game.start();
+  })
+</script>
+</body>
+</html>
